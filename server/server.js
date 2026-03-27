@@ -114,6 +114,22 @@ app.post('/api/analytics/trigger', async (req, res) => {
   await Stats.findOneAndUpdate({}, { $inc: { alertsTriggered: 1 } }, { upsert: true });
   res.sendStatus(200);
 });
+app.get('/reset-admin', async (req, res) => {
+  try {
+    await User.deleteMany({ username: 'admin' });
+
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+
+    await User.create({
+      username: 'admin',
+      password: hashedPassword
+    });
+
+    res.send("Admin reset successful");
+  } catch (err) {
+    res.status(500).send("Error resetting admin");
+  }
+});
 
 // Seed Initial Admin (for demo purposes)
 const seedAdmin = async () => {
