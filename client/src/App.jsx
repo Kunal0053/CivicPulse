@@ -26,6 +26,8 @@ const App = () => {
   const [showLogin, setShowLogin] = useState(false);
 
   const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
   const [feedback, setFeedback] = useState("");
 
   const mapRef = useRef(null);
@@ -115,6 +117,12 @@ const App = () => {
     localStorage.removeItem('adminToken');
     setShowAdminPanel(false);
   };
+
+  // Invalidate map size when admin panel or login modal closes
+  useEffect(() => {
+    if (!mapInstance.current) return;
+    setTimeout(() => mapInstance.current?.invalidateSize(), 300);
+  }, [showAdminPanel, showLogin]);
 
   // 5. Map Initialization & Updates
   useEffect(() => {
@@ -229,26 +237,25 @@ const App = () => {
     try { await api.post('/analytics/trigger'); fetchAnalytics(); } catch(e){}
   };
 
-  const rateProject = async (value) => {
-  try {
-    await api.post(`/projects/${activeProject._id}/rate`, { value });
-    fetchProjects();
-  } catch (err) {
-    console.error("Rating failed", err);
-  }
-};
+  const submitReview = async () => {
+    if (!rating && !feedback.trim()) return;
+    try {
+      if (rating) await api.post(`/projects/${activeProject._id}/rate`, { value: rating });
+      if (feedback.trim()) await api.post(`/projects/${activeProject._id}/feedback`, { text: feedback.trim() });
+      setRatingSubmitted(true);
+      setFeedback("");
+      fetchProjects();
+    } catch (err) {
+      console.error("Review submission failed", err);
+    }
+  };
 
-const submitFeedback = async () => {
-  try {
-    await api.post(`/projects/${activeProject._id}/feedback`, {
-      text: feedback
-    });
+  useEffect(() => {
+    setRating(0);
+    setHoverRating(0);
+    setRatingSubmitted(false);
     setFeedback("");
-    fetchProjects();
-  } catch (err) {
-    console.error("Feedback failed", err);
-  }
-};
+  }, [activeProject?._id]);
   // 7. Project CRUD
   const handleSaveProject = async (e) => {
     e.preventDefault();
@@ -329,7 +336,10 @@ const resetForm = () => {
       </header>
 
       <main className="flex-1 relative flex overflow-hidden">
-        <div className={`flex-1 relative transition-all duration-500 ${showAdminPanel || showLogin ? 'opacity-40 blur-sm grayscale' : 'opacity-100'}`} ref={mapRef} />
+        <div className="flex-1 relative" ref={mapRef} />
+        {(showAdminPanel || showLogin) && (
+          <div className="absolute inset-0 z-[1000] bg-white/40 backdrop-blur-sm grayscale pointer-events-none transition-all duration-500" />
+        )}
 
         {/* Analytics Bar */}
         {!showAdminPanel && !showLogin && (
@@ -396,8 +406,9 @@ const resetForm = () => {
 
         {/* Project Detail Overlay */}
         {activeProject && !showAdminPanel && !showLogin && (
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[95%] max-w-lg z-[1001] animate-in slide-in-from-bottom-8 duration-500">
-            <div className="bg-white rounded-[32px] shadow-2xl overflow-hidden border border-slate-100">
+          <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-[98%] max-w-3xl z-[2000] animate-in slide-in-from-bottom-8 duration-500 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-[32px] shadow-2xl overflow-hidden border border-slate-100 relative">
+              <button onClick={() => setActiveProject(null)} className="absolute top-4 right-4 z-10 p-2 bg-white rounded-full shadow-md text-slate-500 hover:text-slate-800 hover:shadow-lg transition-all"><X className="w-5 h-5"/></button>
               <div className="relative h-48 bg-slate-100">
                 {activeProject.mediaUrl ? (
                   <img src={activeProject.mediaUrl} className="w-full h-full object-cover" alt={activeProject.name} />
@@ -418,55 +429,94 @@ const resetForm = () => {
                 <div className="bg-blue-600 p-5 rounded-2xl text-white shadow-xl shadow-blue-100">
                    <p className="text-xs opacity-70 font-bold uppercase mb-1">Civic Impact</p>
                    <p className="text-sm opacity-90 leading-snug">{activeProject.civicImpact}</p>
-                   {/* Rating Section */}
-<div className="mt-6">
-  <p className="text-sm font-bold text-slate-600 mb-2">Rate this project:</p>
-  <div className="flex gap-2">
-    {[1,2,3,4,5].map(num => (
-      <button 
-        key={num}
-        onClick={() => rateProject(num)}
-        className="text-yellow-400 text-xl"
-      >
-        ⭐
-      </button>
-    ))}
+                   {/* Rating + Feedback Section */}
+<div className="mt-6 bg-white/10 rounded-2xl p-4 space-y-4">
+  {/* Header */}
+  <div className="flex items-center justify-between">
+    <p className="text-sm font-black text-white uppercase tracking-wide">Leave a Review</p>
+    <span className="flex items-center gap-1 text-xs font-bold text-yellow-300 bg-white/10 px-2 py-1 rounded-lg">
+      <span>★</span> {activeProject.avgRating || 0} / 5 &nbsp;·&nbsp; {activeProject.ratings?.length || 0} ratings
+    </span>
   </div>
-  <p className="text-xs text-slate-400 mt-1">
-    Avg Rating: {activeProject.avgRating || 0}
-  </p>
-</div>
 
-{/*FeedBack*/}
-<div className="mt-6">
-  <p className="text-sm font-bold text-slate-600 mb-2">Give Feedback:</p>
-  <textarea
-  className="w-full p-3 rounded-xl bg-slate-50 border text-black placeholder-gray-500 !text-black"
-  style={{ color: "black" }}
-  placeholder="Write your feedback..."
-  value={feedback}
-  onChange={(e) => setFeedback(e.target.value)}
-/>
-  <button
-    onClick={submitFeedback}
-    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold"
-  >
-    Submit
-  </button>
-</div>
-{/* Show Feedback */}
-<div className="mt-4">
-  <p className="text-sm font-bold text-slate-600 mb-2">User Feedback:</p>
-
-  <div className="space-y-2 max-h-32 overflow-y-auto">
-    {activeProject.feedbacks && activeProject.feedbacks.length > 0 ? (
-      activeProject.feedbacks.map((f, index) => (
-        <div key={index} className="p-2 bg-slate-100 rounded-lg text-black text-sm">
-          {f.text}
+  {ratingSubmitted ? (
+    <div className="flex items-center gap-3 bg-white/10 rounded-xl p-3">
+      <span className="text-yellow-400 text-xl tracking-tight">
+        {'★'.repeat(rating)}{'☆'.repeat(5 - rating)}
+      </span>
+      <span className="text-white/80 text-sm font-bold">Review submitted — thank you!</span>
+    </div>
+  ) : (
+    <>
+      {/* Stars */}
+      <div>
+        <p className="text-xs text-white/60 font-semibold mb-2">Your Rating</p>
+        <div className="flex gap-1">
+          {[1,2,3,4,5].map(num => (
+            <button
+              key={num}
+              onClick={() => setRating(num)}
+              onMouseEnter={() => setHoverRating(num)}
+              onMouseLeave={() => setHoverRating(0)}
+              className="text-3xl transition-transform hover:scale-110 leading-none"
+            >
+              <span className={num <= (hoverRating || rating) ? 'text-yellow-400' : 'text-white/25'}>
+                {num <= (hoverRating || rating) ? '★' : '☆'}
+              </span>
+            </button>
+          ))}
         </div>
-      ))
+        {rating > 0 && (
+          <p className="text-xs text-yellow-300 mt-1">{['','Poor','Fair','Good','Very Good','Excellent'][rating]} — {rating} star{rating > 1 ? 's' : ''}</p>
+        )}
+      </div>
+
+      {/* Feedback textarea */}
+      <div>
+        <p className="text-xs text-white/60 font-semibold mb-2">Your Feedback <span className="text-white/30">(optional)</span></p>
+        <textarea
+          rows="3"
+          className="w-full p-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/30 text-sm resize-none outline-none focus:border-white/40"
+          placeholder="Share your thoughts about this project..."
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+        />
+      </div>
+
+      {/* Submit */}
+      <button
+        onClick={submitReview}
+        disabled={!rating && !feedback.trim()}
+        className="w-full py-3 bg-white text-blue-600 rounded-xl font-black text-sm hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        Submit Review
+      </button>
+    </>
+  )}
+</div>
+
+{/* Community Reviews */}
+<div className="mt-4">
+  <p className="text-xs text-white/60 font-black uppercase tracking-wide mb-3">
+    Community Reviews ({activeProject.feedbacks?.length || 0})
+  </p>
+  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+    {activeProject.feedbacks && activeProject.feedbacks.length > 0 ? (
+      activeProject.feedbacks.slice().reverse().map((f, index) => {
+        const matchedRating = activeProject.ratings?.[activeProject.ratings.length - 1 - index];
+        return (
+          <div key={index} className="bg-white/10 rounded-xl p-3">
+            {matchedRating && (
+              <p className="text-yellow-400 text-xs mb-1 tracking-tight">
+                {'★'.repeat(matchedRating.value)}{'☆'.repeat(5 - matchedRating.value)}
+              </p>
+            )}
+            <p className="text-white/80 text-sm leading-snug">{f.text}</p>
+          </div>
+        );
+      })
     ) : (
-      <p className="text-xs text-gray-400">No feedback yet</p>
+      <p className="text-white/30 text-xs italic">No reviews yet — be the first!</p>
     )}
   </div>
 </div>
