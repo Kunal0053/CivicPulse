@@ -7,7 +7,7 @@ import {
 
 // --- CONFIGURATION ---
 // Change this to your local or deployed server URL
-const API_BASE_URL = 'https://civicpulse-y078.onrender.com';
+const API_BASE_URL = 'https://civicpulse-y078.onrender.com/api';
 
 const App = () => {
   const [projects, setProjects] = useState([]);
