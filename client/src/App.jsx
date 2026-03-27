@@ -25,6 +25,9 @@ const App = () => {
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [showLogin, setShowLogin] = useState(false);
 
+  const [rating, setRating] = useState(0);
+  const [feedback, setFeedback] = useState("");
+
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const markersRef = useRef({});
@@ -226,6 +229,26 @@ const App = () => {
     try { await api.post('/analytics/trigger'); fetchAnalytics(); } catch(e){}
   };
 
+  const rateProject = async (value) => {
+  try {
+    await api.post(`/projects/${activeProject._id}/rate`, { value });
+    fetchProjects();
+  } catch (err) {
+    console.error("Rating failed", err);
+  }
+};
+
+const submitFeedback = async () => {
+  try {
+    await api.post(`/projects/${activeProject._id}/feedback`, {
+      text: feedback
+    });
+    setFeedback("");
+    fetchProjects();
+  } catch (err) {
+    console.error("Feedback failed", err);
+  }
+};
   // 7. Project CRUD
   const handleSaveProject = async (e) => {
     e.preventDefault();
@@ -251,13 +274,16 @@ const App = () => {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      name: '', description: '', budget: '', timeline: '', 
-      status: 'Ongoing', civicImpact: '', radius: 500,
-      lat: userLocation?.lat || 20.5937, lng: userLocation?.lng || 78.9629, mediaUrl: ''
-    });
-  };
+const resetForm = () => {
+  setFormData({
+    name: '', description: '', budget: '', timeline: '', 
+    status: 'Ongoing', civicImpact: '', radius: 500,
+    lat: userLocation?.lat || 20.5937,
+    lng: userLocation?.lng || 78.9629,
+    mediaUrl: '',
+    category: 'Road'
+  });
+};
 
   const flyToLocation = (lat, lng) => {
     if (mapInstance.current) mapInstance.current.flyTo([lat, lng], 15);
@@ -392,6 +418,58 @@ const App = () => {
                 <div className="bg-blue-600 p-5 rounded-2xl text-white shadow-xl shadow-blue-100">
                    <p className="text-xs opacity-70 font-bold uppercase mb-1">Civic Impact</p>
                    <p className="text-sm opacity-90 leading-snug">{activeProject.civicImpact}</p>
+                   {/* Rating Section */}
+<div className="mt-6">
+  <p className="text-sm font-bold text-slate-600 mb-2">Rate this project:</p>
+  <div className="flex gap-2">
+    {[1,2,3,4,5].map(num => (
+      <button 
+        key={num}
+        onClick={() => rateProject(num)}
+        className="text-yellow-400 text-xl"
+      >
+        ⭐
+      </button>
+    ))}
+  </div>
+  <p className="text-xs text-slate-400 mt-1">
+    Avg Rating: {activeProject.avgRating || 0}
+  </p>
+</div>
+
+{/*FeedBack*/}
+<div className="mt-6">
+  <p className="text-sm font-bold text-slate-600 mb-2">Give Feedback:</p>
+  <textarea
+  className="w-full p-3 rounded-xl bg-slate-50 border text-black placeholder-gray-500 !text-black"
+  style={{ color: "black" }}
+  placeholder="Write your feedback..."
+  value={feedback}
+  onChange={(e) => setFeedback(e.target.value)}
+/>
+  <button
+    onClick={submitFeedback}
+    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-bold"
+  >
+    Submit
+  </button>
+</div>
+{/* Show Feedback */}
+<div className="mt-4">
+  <p className="text-sm font-bold text-slate-600 mb-2">User Feedback:</p>
+
+  <div className="space-y-2 max-h-32 overflow-y-auto">
+    {activeProject.feedbacks && activeProject.feedbacks.length > 0 ? (
+      activeProject.feedbacks.map((f, index) => (
+        <div key={index} className="p-2 bg-slate-100 rounded-lg text-black text-sm">
+          {f.text}
+        </div>
+      ))
+    ) : (
+      <p className="text-xs text-gray-400">No feedback yet</p>
+    )}
+  </div>
+</div>
                 </div>
               </div>
             </div>
@@ -450,6 +528,19 @@ const App = () => {
                 <select className="w-full px-6 py-4 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none font-bold appearance-none" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
                   <option>Ongoing</option><option>Completed</option><option>Planned</option>
                 </select>
+                <div className="space-y-2">
+  <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Category</label>
+  <select 
+    className="w-full px-6 py-4 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-blue-500 outline-none font-bold"
+    value={formData.category || "Road"}
+    onChange={e => setFormData({...formData, category: e.target.value})}
+  >
+    <option>Hospital</option>
+    <option>Road</option>
+    <option>Bridge</option>
+    <option>College</option>
+  </select>
+</div>
               </div>
               <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-1">Latitude</label><input type="number" step="any" required className="w-full px-6 py-4 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none font-bold" value={formData.lat} onChange={e => setFormData({...formData, lat: e.target.value})} /></div>
               <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-1">Longitude</label><input type="number" step="any" required className="w-full px-6 py-4 rounded-3xl bg-slate-50 border-2 border-transparent focus:border-blue-500 focus:bg-white outline-none font-bold" value={formData.lng} onChange={e => setFormData({...formData, lng: e.target.value})} /></div>
