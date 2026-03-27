@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -6,8 +8,10 @@ const bcrypt = require('bcryptjs');
 const app = express();
 
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = 'your_super_secret_key_123'; // In production, use env variables
-const MONGO_URI = 'mongodb://localhost:27017/civicpulse';
+require('dotenv').config();
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const MONGO_URI = process.env.MONGO_URI;
 
 // --- MIDDLEWARE ---
 app.use(cors());
