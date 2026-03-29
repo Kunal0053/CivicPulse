@@ -1,0 +1,6 @@
+{
+  "startupCommands": [
+    "cd server; npm install; node server.js",
+    "cd client; npm install; npm run dev"
+  ]
+}
